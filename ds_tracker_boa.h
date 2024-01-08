@@ -212,12 +212,12 @@ class BOATracker : public BaseTracker<T> {
     }
     void *obj = nullptr;
     int reclaimed_counter = 0;
-    while (!obj) {
-      if (reclaimed_counter == 2) { ready_pool_[tid].Reserve(1); }
-      obj = ready_pool_[tid].Pop();
-      if (!obj) {
-        empty(tid);
-        reclaimed_counter++;
+    while (!(obj = ready_pool_[tid].Pop())) {
+      // obj = ready_pool_[tid].Pop();
+      empty(tid);
+      reclaimed_counter++;
+      if (reclaimed_counter == 2) {
+        ready_pool_[tid].Reserve(1);
       }
     }
     alloc_since_[tid].first++;
@@ -253,19 +253,18 @@ class BOATracker : public BaseTracker<T> {
     processing_pool_[tid] = retire_pool_[tid];
     retire_pool_[tid] = new_retire;
 
-    while (!processing_pool_[tid].Empty()) {
-      T *res = processing_pool_[tid].Pop();
-      if (res) {
-        if (!check_conflict(res)) {
-          if(reserve_cnt-- > 0){
-            ready_pool_[tid].AddReady(res);
-          } else {  // pool[tid] has already reserved enough blocks
-            processing_pool_[tid].FreeBlock((char *)res);
-          }
-
-        } else {
-          retire_pool_[tid].Add(res);
+    T *res = nullptr;
+    while ((res = processing_pool_[tid].Pop())) {
+      // T *res = processing_pool_[tid].Pop();
+      if (!check_conflict(res)) {
+        if (reserve_cnt > 0) {
+          ready_pool_[tid].AddReady(res);
+          reserve_cnt--;
+        } else {  // pool[tid] has already reserved enough blocks
+          processing_pool_[tid].FreeBlock((char *) res);
         }
+      } else {
+        retire_pool_[tid].Add(res);
       }
     }
     if(reserve_cnt > 0){  // ready_pool_[tid] needs to reserve more
