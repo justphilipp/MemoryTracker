@@ -23,6 +23,10 @@
 #define COLLECT true
 #endif
 
+/** implement predictive load-balance algorithm
+ *
+ * */
+
 
 template<typename T>
 class KWDBLockFreeLinkedListBOATracker : public RetiredMonitorable {

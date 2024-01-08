@@ -94,7 +94,7 @@ class FreelistStack {
   }
 
   void Reserve(std::size_t count) {
-    for (std::size_t i = 0; i != count; ++i) {
+    for (std::size_t i = 0; i < count; ++i) {
       char *block = reinterpret_cast<char *>(malloc(2 * sizeof(uint64_t) + sizeof(T)));
       auto *birth_epoch = reinterpret_cast<uint64_t *>(block + sizeof(T));
       *birth_epoch = -1;
@@ -125,6 +125,10 @@ class FreelistStack {
     new_pool_ptr->next = old_pool;
     FreelistNodePtr new_pool(new_pool_ptr);
     pool_ = new_pool;
+  }
+
+  void FreeBlock(char* block){
+    free(block);
   }
 };
 
@@ -157,6 +161,8 @@ class BOATracker : public BaseTracker<T> {
   std::vector<FreelistStack<T>> processing_pool_;
   std::vector<FreelistStack<T>> ready_pool_;
 
+  std::vector<std::pair<uint64_t, uint64_t>> alloc_since_;
+
  public:
   BOATracker(int task_num, int slotsPerThread, int epochFreq, int emptyFreq, bool collect) : BaseTracker<T>(task_num),
                                                                                              task_num_(task_num),
@@ -182,6 +188,12 @@ class BOATracker : public BaseTracker<T> {
     for (auto &pool: ready_pool_) {
       pool.Reserve(2001);
     }
+
+    // LB
+    // 0 -> alloc since last time
+    // 1 -> dealloc since last time
+    // std::vector<std::vector<std::queue<uint64_t>>> alloc_since(task_num_, std::vector<std::queue<uint64_t>>(2));
+    alloc_since_.resize(task_num_);
   }
 
   ~BOATracker() {
@@ -208,6 +220,7 @@ class BOATracker : public BaseTracker<T> {
         reclaimed_counter++;
       }
     }
+    alloc_since_[tid].first++;
     auto node = reinterpret_cast<char *>(obj);
     auto *birth_epoch = reinterpret_cast<uint64_t *>(node + sizeof(T));
     *birth_epoch = get_epoch();
@@ -220,6 +233,7 @@ class BOATracker : public BaseTracker<T> {
   void retire(T *obj, int tid) {
     write_retire(obj);
     retire_pool_[tid].Add(obj);
+    alloc_since_[tid].second++;
   }
 
   void reclaim(T *obj, int tid) {
@@ -227,6 +241,7 @@ class BOATracker : public BaseTracker<T> {
   }
 
   void empty(int tid) {
+    uint64_t reserve_cnt = HandleReserve(tid);
     for (int i = 0; i < task_num_; i++) {
       warnings[i] = true;
     }
@@ -242,11 +257,19 @@ class BOATracker : public BaseTracker<T> {
       T *res = processing_pool_[tid].Pop();
       if (res) {
         if (!check_conflict(res)) {
-          ready_pool_[tid].AddReady(res);
+          if(reserve_cnt-- > 0){
+            ready_pool_[tid].AddReady(res);
+          } else {  // pool[tid] has already reserved enough blocks
+            processing_pool_[tid].FreeBlock((char *)res);
+          }
+
         } else {
           retire_pool_[tid].Add(res);
         }
       }
+    }
+    if(reserve_cnt > 0){  // ready_pool_[tid] needs to reserve more
+      ready_pool_[tid].Reserve(reserve_cnt);
     }
   }
 
@@ -315,6 +338,13 @@ class BOATracker : public BaseTracker<T> {
   void end_op(int tid) {
     upper_reservs[tid].ui.store(UINT64_MAX, std::memory_order_release);
     lower_reservs[tid].ui.store(UINT64_MAX, std::memory_order_release);
+  }
+
+  uint64_t HandleReserve(int tid){
+    uint64_t res;
+    float percentage = (float)alloc_since_[tid].first / (float)(alloc_since_[tid].second + 1);  // divide by zero
+    res = alloc_since_[tid].first * 2 * (uint64_t)percentage;
+    return res;
   }
 };
 
