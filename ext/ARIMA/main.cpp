@@ -1,17 +1,16 @@
-#include <iostream>
+//
+// Created by yue on 18-3-16.
+//
+
 #include <vector>
-#include "ds_lockfree_linkedlist_with_tracker.h"
-#include "ext/ARIMA/ARIMAModel.h"
+#include "cstdio"
+#include "iostream"
+// #include <cmath>
+#include "ARIMAModel.h"
+
 
 int main() {
-  KWDBLockFreeLinkedListWithTracker<int> lists(8, BOA);
-
-  lists.Insert(1, 1);
-  lists.Insert(2, 1);
-  lists.Insert(0, 1);
-  std::cout << lists.Find(0, 1);
-
-  freopen("/home/tonghua/Tracker/tsdata.txt", "r", stdin);
+  freopen("/home/tonghua/Tracker/ext/ARIMA/data.txt", "r", stdin);
   double gets;
   std::vector<double> dataArray;
   while (std::cin >> gets) {
@@ -55,6 +54,4 @@ int main() {
   int predict = (int) std::round(sumPredict);
   std::cout << "Predict value=" << predict << std::endl;
 
-
-  return 0;
 }

@@ -9,7 +9,13 @@ set(EXT_PROJECTS_DIR ${PROJECT_SOURCE_DIR}/ext)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/test)
 
-#enable_testing()
+add_subdirectory(${EXT_PROJECTS_DIR}/ARIMA)
+
+#target_link_directories(Tracker ${EXT_PROJECTS_DIR}/ARIMA)
+
 
 target_link_libraries(Tracker pthread atomic)
 
+add_executable(main main.cpp ${EXT_PROJECTS_DIR}/ARIMA/ARMAMath.cpp ${EXT_PROJECTS_DIR}/ARIMA/MAModel.cpp)
+
+target_link_libraries(main pthread atomic)
