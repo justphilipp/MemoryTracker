@@ -29,10 +29,10 @@ int main() {
 
   for (int k = 0; k < modelCnt; ++k)      //控制通过多少组参数进行计算最终的结果
   {
-    std::vector<int> bestModel = arima->getARIMAModel(period, list, (k == 0) ? false : true);
+    std::vector<int> bestModel = arima->getARIMAModel(period, list, k != 0);
     //std::cout<<bestModel.size()<<std::endl;
 
-    if (bestModel.size() == 0) {
+    if (bestModel.empty()) {
       tmpPredict[k] = (int) dataArray[dataArray.size() - period];
       cnt++;
       break;

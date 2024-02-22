@@ -1,4 +1,3 @@
-// Copyright (c) 2020-present,  INSPUR Co, Ltd.  All rights reserved.
 
 #ifndef COMMON_SRC_H_DS_TRACKER_BOA_H
 #define COMMON_SRC_H_DS_TRACKER_BOA_H
@@ -7,7 +6,7 @@
 
 #include "ds_tracker_concurrent_primitives.h"
 #include "ds_tracker_base.h"
-
+#include "ext/ARIMA/ARIMAModel.h"
 
 namespace boatracker {
 
@@ -163,6 +162,10 @@ class BOATracker : public BaseTracker<T> {
 
   std::vector<std::pair<uint64_t, uint64_t>> alloc_since_;
 
+  // just fix n = 5 right now
+  std::vector<std::list<time_t>> alloc_last_n_mins;
+  std::vector<std::list<time_t>> dealloc_last_n_mins;
+
  public:
   BOATracker(int task_num, int slotsPerThread, int epochFreq, int emptyFreq, bool collect) : BaseTracker<T>(task_num),
                                                                                              task_num_(task_num),
@@ -194,6 +197,8 @@ class BOATracker : public BaseTracker<T> {
     // 1 -> dealloc since last time
     // std::vector<std::vector<std::queue<uint64_t>>> alloc_since(task_num_, std::vector<std::queue<uint64_t>>(2));
     alloc_since_.resize(task_num_);
+    alloc_last_n_mins.resize(task_num_);
+    dealloc_last_n_mins.resize(task_num_);
   }
 
   ~BOATracker() {
@@ -216,11 +221,12 @@ class BOATracker : public BaseTracker<T> {
       // obj = ready_pool_[tid].Pop();
       empty(tid);
       reclaimed_counter++;
-      if (reclaimed_counter == 2) {
+      if (reclaimed_counter >= 2) {
         ready_pool_[tid].Reserve(1);
       }
     }
     alloc_since_[tid].first++;
+    alloc_last_n_mins[tid].push_back(time(nullptr));
     auto node = reinterpret_cast<char *>(obj);
     auto *birth_epoch = reinterpret_cast<uint64_t *>(node + sizeof(T));
     *birth_epoch = get_epoch();
@@ -234,6 +240,7 @@ class BOATracker : public BaseTracker<T> {
     write_retire(obj);
     retire_pool_[tid].Add(obj);
     alloc_since_[tid].second++;
+    dealloc_last_n_mins[tid].push_back(time(nullptr));
   }
 
   void reclaim(T *obj, int tid) {
@@ -241,7 +248,9 @@ class BOATracker : public BaseTracker<T> {
   }
 
   void empty(int tid) {
-    uint64_t reserve_cnt = HandleReserve(tid);
+    // uint64_t reserve_cnt = HandleReserveStrawman(tid);
+
+    uint64_t reserve_cnt = HandleReserveARIMA(tid, 5);
     for (int i = 0; i < task_num_; i++) {
       warnings[i] = true;
     }
@@ -339,11 +348,81 @@ class BOATracker : public BaseTracker<T> {
     lower_reservs[tid].ui.store(UINT64_MAX, std::memory_order_release);
   }
 
-  uint64_t HandleReserve(int tid){
+  uint64_t HandleReserveStrawman(int tid){
     uint64_t res;
     float percentage = (float)alloc_since_[tid].first / (float)(alloc_since_[tid].second + 1);  // divide by zero
     res = alloc_since_[tid].first * 2 * (uint64_t)percentage;
     return res;
+  }
+
+  uint64_t HandleReserveARIMA(int tid, int nmins){
+    uint64_t res;
+    std::vector<double> tsdata(nmins);
+    time_t nowtime = time(nullptr);
+
+    auto alloclist = alloc_last_n_mins[tid];
+    for (auto it = alloclist.begin(); it != alloclist.end();) {
+      if ((nowtime - *it) >= nmins * 60) {
+        it = alloclist.erase(it);
+      } else {
+        int index = nmins - 1 - (nowtime - *it) / 60;
+        tsdata[index]++;
+        it++;
+      }
+    }
+
+    auto dealloclist = dealloc_last_n_mins[tid];
+    for (auto it = dealloclist.begin(); it != dealloclist.end();) {
+      if ((nowtime - *it) >= nmins * 60) {
+        it = dealloclist.erase(it);
+      } else {
+        int index = nmins - 1 - (nowtime - *it) / 60;
+        tsdata[index]--;
+        it++;
+      }
+    }
+//    for (auto num : tsdata){
+//      std::cout << num << " ";
+//    }
+//    std::cout << std::endl;
+
+    auto *arima = new ARIMAModel(tsdata);
+
+    int period = 1;
+    int modelCnt = 5;
+    int cnt = 0;
+    std::vector<std::vector<int>> list;
+    std::vector<int> tmpPredict(modelCnt);
+
+    for (int k = 0; k < modelCnt; ++k)      //控制通过多少组参数进行计算最终的结果
+    {
+      std::vector<int> bestModel = arima->getARIMAModel(period, list, k != 0);
+      //std::cout<<bestModel.size()<<std::endl;
+
+      if (bestModel.empty()) {
+        tmpPredict[k] = (int) tsdata[tsdata.size() - period];
+        cnt++;
+        break;
+      } else {
+        //std::cout<<bestModel[0]<<bestModel[1]<<std::endl;
+        int predictDiff = arima->predictValue(bestModel[0], bestModel[1], period);
+        //std::cout<<"fuck"<<std::endl;
+        tmpPredict[k] = arima->aftDeal(predictDiff, period);
+        cnt++;
+      }
+      // std::cout << bestModel[0] << " " << bestModel[1] << std::endl;
+      list.push_back(bestModel);
+    }
+
+    double sumPredict = 0.0;
+    for (int k = 0; k < cnt; ++k) {
+      sumPredict += ((double) tmpPredict[k]) / (double) cnt;
+    }
+    int predict = (int) std::round(sumPredict);
+//    std::cout << "Predict value=" << predict << std::endl;
+
+    delete arima;
+    return predict;
   }
 };
 

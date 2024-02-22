@@ -6,7 +6,7 @@ aux_source_directory(. TEST_LIST)
 # 指定头文件目录
 #include_directories(${PROJECT_SOURCE_DIR}/ext/gtest)
 # 指定静态链接库文件目录
-#link_directories(${PROJECT_SOURCE_DIR}/ext/gtest/lib)
+#link_directories(${PROJECT_SOURCE_DIR}/ext/ARIMA)
 # 执行文件
-add_executable(${PROJECT_NAME} ${TEST_LIST})
+add_executable(${PROJECT_NAME} ${TEST_LIST} ${EXT_PROJECTS_DIR}/ARIMA/ARMAMath.cpp ${EXT_PROJECTS_DIR}/ARIMA/MAModel.cpp)
 target_link_libraries(${PROJECT_NAME} gtest gtest_main)
