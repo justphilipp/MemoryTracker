@@ -42,15 +42,21 @@ TEST_F(TestARIMA, ARIMAIntegration) {
   std::uniform_int_distribution<int> index(0,3);
   std::uniform_int_distribution<int> ops(0,2);
   time_t start = time(nullptr);
+  int cnt = 0;
   while(time(nullptr) - start < 360){
     int value = u(e);
     int idx = index(e);
     int op = ops(e);
     if(op == 2){
-      list.Delete(value, idx);
+      if(list.Delete(value, idx)){
+        cnt--;
+      }
     } else {
-      list.Insert(value, idx);
+      if(list.Insert(value, idx)){
+        cnt++;
+      }
     }
+//    std::cout << cnt << std::endl;
   }
   std::cout << "timeout" << std::endl;
 }

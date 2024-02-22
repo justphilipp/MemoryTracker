@@ -18,23 +18,26 @@ int main() {
     dataArray.push_back(gets);
     std::cout << gets << std::endl;
   }
+  time_t now = time(nullptr);
 
-  ARIMAModel *arima = new ARIMAModel(dataArray);
+  std::vector<double> array{-33, 28, -52, 70, -7};
+
+  ARIMAModel *arima = new ARIMAModel(array);
 
 
-  int period = 7;
-  int modelCnt = 5;
+  int period = 1;
+  int modelCnt = 1;
   int cnt = 0;
   std::vector<std::vector<int>> list;
   std::vector<int> tmpPredict(modelCnt);
 
   for (int k = 0; k < modelCnt; ++k)      //控制通过多少组参数进行计算最终的结果
   {
-    std::vector<int> bestModel = arima->getARIMAModel(period, list, (k == 0) ? false : true);
+    std::vector<int> bestModel = arima->getARIMAModel(period, list, k != 0);
     //std::cout<<bestModel.size()<<std::endl;
 
-    if (bestModel.size() == 0) {
-      tmpPredict[k] = (int) dataArray[dataArray.size() - period];
+    if (bestModel.empty()) {
+      tmpPredict[k] = (int) dataArray[array.size() - period];
       cnt++;
       break;
     } else {
@@ -55,6 +58,7 @@ int main() {
   int predict = (int) std::round(sumPredict);
   std::cout << "Predict value=" << predict << std::endl;
 
+  delete arima;
 
   return 0;
 }

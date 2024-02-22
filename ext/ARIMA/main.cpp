@@ -18,6 +18,9 @@ int main() {
     std::cout << gets << std::endl;
   }
 
+
+
+
   ARIMAModel *arima = new ARIMAModel(dataArray);
 
 
@@ -53,5 +56,5 @@ int main() {
   }
   int predict = (int) std::round(sumPredict);
   std::cout << "Predict value=" << predict << std::endl;
-
+}
 }

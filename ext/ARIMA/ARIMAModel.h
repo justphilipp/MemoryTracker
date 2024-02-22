@@ -220,22 +220,22 @@ public:
 
     if (p == 0) {
       std::vector<double> maCoe(this->arima[0]);
-//      for (int k = q; k < n; ++k) {
-//        tmpMA = 0;
-//        for (int i = 1; i <= q; ++i) {
-//          tmpMA += maCoe[i] * errData[i];
-//        }
-//        //产生各个时刻的噪声
-//        for (int j = q; j > 0; --j) {
-//          errData[j] = errData[j - 1];
-//        }
-//        errData[0] = gaussrand() * std::sqrt(maCoe[0]);
-//      }
-
-      for (int i = 1; i <= q; i++) {
-        double err_data = gaussrand() * std::sqrt(maCoe[0]);
-        tmpMA += maCoe[i] + err_data;
+      for (int k = q; k < n; ++k) {
+        tmpMA = 0;
+        for (int i = 1; i <= q; ++i) {
+          tmpMA += maCoe[i] * errData[i];
+        }
+        //产生各个时刻的噪声
+        for (int j = q; j > 0; --j) {
+          errData[j] = errData[j - 1];
+        }
+        errData[0] = gaussrand() * std::sqrt(maCoe[0]);
       }
+
+//      for (int i = 1; i <= q; i++) {
+//        double err_data = gaussrand() * std::sqrt(maCoe[0]);
+//        tmpMA += maCoe[i] + err_data;
+//      }
 
       predict = (int) (tmpMA); //产生预测
     } else if (q == 0) {

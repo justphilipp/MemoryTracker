@@ -250,7 +250,7 @@ class BOATracker : public BaseTracker<T> {
   void empty(int tid) {
     // uint64_t reserve_cnt = HandleReserveStrawman(tid);
 
-    uint64_t reserve_cnt = HandleReserveARIMA(tid, 5);
+    int reserve_cnt = HandleReserveARIMA(tid, 5);
     for (int i = 0; i < task_num_; i++) {
       warnings[i] = true;
     }
@@ -356,7 +356,7 @@ class BOATracker : public BaseTracker<T> {
     return res;
   }
 
-  uint64_t HandleReserveARIMA(int tid, int nmins){
+  int HandleReserveARIMA(int tid, int nmins){
     uint64_t res;
     std::vector<double> tsdata(nmins);
     time_t nowtime = time(nullptr);
@@ -382,15 +382,15 @@ class BOATracker : public BaseTracker<T> {
         it++;
       }
     }
-//    for (auto num : tsdata){
-//      std::cout << num << " ";
-//    }
-//    std::cout << std::endl;
+    for (auto num : tsdata){
+      std::cout << num << " ";
+    }
+    std::cout << std::endl;
 
     auto *arima = new ARIMAModel(tsdata);
 
     int period = 1;
-    int modelCnt = 5;
+    int modelCnt = 1;
     int cnt = 0;
     std::vector<std::vector<int>> list;
     std::vector<int> tmpPredict(modelCnt);
@@ -409,6 +409,10 @@ class BOATracker : public BaseTracker<T> {
         int predictDiff = arima->predictValue(bestModel[0], bestModel[1], period);
         //std::cout<<"fuck"<<std::endl;
         tmpPredict[k] = arima->aftDeal(predictDiff, period);
+
+        if(tmpPredict[k] < -10000) {
+          std::cout << "err" << std::endl;
+        }
         cnt++;
       }
       // std::cout << bestModel[0] << " " << bestModel[1] << std::endl;
@@ -420,7 +424,8 @@ class BOATracker : public BaseTracker<T> {
       sumPredict += ((double) tmpPredict[k]) / (double) cnt;
     }
     int predict = (int) std::round(sumPredict);
-//    std::cout << "Predict value=" << predict << std::endl;
+
+    std::cout << "Predict value=" << predict << std::endl;
 
     delete arima;
     return predict;
