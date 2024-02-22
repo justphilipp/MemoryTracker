@@ -97,7 +97,7 @@ class FreelistStack {
       char *block = reinterpret_cast<char *>(malloc(2 * sizeof(uint64_t) + sizeof(T)));
       auto *birth_epoch = reinterpret_cast<uint64_t *>(block + sizeof(T));
       *birth_epoch = -1;
-      auto *retire_epoch = reinterpret_cast<uint64_t *>(block + sizeof(T) + 1);
+      auto *retire_epoch = reinterpret_cast<uint64_t *>(block + sizeof(T) + sizeof(uint64_t));
       *retire_epoch = UINT64_MAX;
       DeallocateUnsafe(block);
     }
@@ -286,9 +286,10 @@ class BOATracker : public BaseTracker<T> {
   }
 
   bool check_conflict(T *node) {
-    auto birth_epoch = reinterpret_cast<uint64_t *>(node + sizeof(T));
+    auto ptr = reinterpret_cast<char *>(node);
+    auto birth_epoch = reinterpret_cast<uint64_t *>(ptr + sizeof(T));
     uint64_t birth_e = *birth_epoch;
-    auto retire_epoch = reinterpret_cast<uint64_t *>(node + sizeof(T) + sizeof(uint64_t));
+    auto retire_epoch = reinterpret_cast<uint64_t *>(ptr + sizeof(T) + sizeof(uint64_t));
     uint64_t retire_e = *retire_epoch;
     for (int i = 0; i < task_num_; i++) {
       if (upper_reservs[i].ui >= birth_e && lower_reservs[i].ui <= retire_e) {
@@ -299,7 +300,7 @@ class BOATracker : public BaseTracker<T> {
   }
 
   void write_retire(T *obj) {
-    auto *retire_epoch = reinterpret_cast<uint64_t *>(reinterpret_cast<char *>(obj) + sizeof(T) + 1);
+    auto *retire_epoch = reinterpret_cast<uint64_t *>(reinterpret_cast<char *>(obj) + sizeof(T) + sizeof(uint64_t));
     *retire_epoch = get_epoch();
   }
 
